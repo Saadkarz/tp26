@@ -1,7 +1,6 @@
 # 📚 TP26 - Microservices Observable & Résilient
 
 > **Auteur:** Karzouz Saad  
-> **Date:** Décembre 2024  
 > **Technologies:** Spring Boot 3.2, Resilience4j, MySQL, Docker, Actuator
 
 ---
