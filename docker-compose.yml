@@ -1,0 +1,123 @@
+# ===========================================
+# Docker Compose - TP26
+# Microservices Observable & Résilient
+# ===========================================
+#
+# Services:
+# - mysql: Base de données MySQL 8
+# - pricing-service: Service de pricing (port 8081)
+# - book-service: Service de gestion des livres (port 8080)
+#
+# Utilisation:
+# - Lancement normal: docker-compose up --build -d
+# - Avec scaling: docker-compose up --build -d && docker-compose up --scale book-service=3 -d
+# - Logs: docker-compose logs -f
+#
+# ===========================================
+
+version: '3.8'
+
+services:
+  # ===========================================
+  # MySQL Database
+  # ===========================================
+  mysql:
+    image: mysql:8.0
+    container_name: tp26-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: books
+      MYSQL_USER: booksuser
+      MYSQL_PASSWORD: bookspass
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    command: --default-authentication-plugin=mysql_native_password
+    healthcheck:
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prootpass" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - tp26-network
+
+  # ===========================================
+  # Pricing Service
+  # ===========================================
+  pricing-service:
+    build:
+      context: ./pricing-service
+      dockerfile: Dockerfile
+    container_name: tp26-pricing-service
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - SERVER_PORT=8081
+      - JAVA_OPTS=-Xmx256m -Xms128m
+    healthcheck:
+      test: [ "CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8081/actuator/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    networks:
+      - tp26-network
+
+  # ===========================================
+  # Book Service
+  # ===========================================
+  book-service:
+    build:
+      context: ./book-service
+      dockerfile: Dockerfile
+    # Note: pas de container_name pour permettre le scaling
+    restart: unless-stopped
+    ports:
+      - "8080-8089:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - SERVER_PORT=8080
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/books?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      - SPRING_DATASOURCE_USERNAME=booksuser
+      - SPRING_DATASOURCE_PASSWORD=bookspass
+      - PRICING_URL=http://pricing-service:8081
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - MAX_RETRIES=30
+      - RETRY_INTERVAL=2
+      - JAVA_OPTS=-Xmx512m -Xms256m
+    depends_on:
+      mysql:
+        condition: service_healthy
+      pricing-service:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/actuator/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
+    networks:
+      - tp26-network
+
+# ===========================================
+# Networks
+# ===========================================
+networks:
+  tp26-network:
+    driver: bridge
+    name: tp26-network
+
+# ===========================================
+# Volumes
+# ===========================================
+volumes:
+  mysql-data:
+    driver: local
+    name: tp26-mysql-data

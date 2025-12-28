@@ -1,0 +1,145 @@
+spring:
+  application:
+    name: book-service
+
+server:
+  port: ${SERVER_PORT:8080}
+
+# Pricing Service URL
+pricing:
+  service:
+    url: ${PRICING_URL:http://localhost:8081}
+
+# Actuator Configuration - Observabilité
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,env,prometheus,circuitbreakers,retries
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: always
+      show-components: always
+  health:
+    circuitbreakers:
+      enabled: true
+  info:
+    env:
+      enabled: true
+
+# Application Info
+info:
+  app:
+    name: Book Service
+    description: Microservice de gestion des livres avec résilience - TP26
+    version: 1.0.0
+    author: Karzouz Saad
+
+# Resilience4j Configuration
+resilience4j:
+  # Circuit Breaker Configuration
+  circuitbreaker:
+    instances:
+      pricing:
+        registerHealthIndicator: true
+        slidingWindowSize: 10
+        slidingWindowType: COUNT_BASED
+        minimumNumberOfCalls: 5
+        permittedNumberOfCallsInHalfOpenState: 3
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        waitDurationInOpenState: 10s
+        failureRateThreshold: 50
+        eventConsumerBufferSize: 10
+        recordExceptions:
+          - java.lang.Exception
+          - java.lang.RuntimeException
+          - org.springframework.web.client.RestClientException
+  
+  # Retry Configuration
+  retry:
+    instances:
+      pricing:
+        maxAttempts: 3
+        waitDuration: 1s
+        enableExponentialBackoff: true
+        exponentialBackoffMultiplier: 2
+        retryExceptions:
+          - java.lang.Exception
+          - org.springframework.web.client.RestClientException
+
+# Logging Configuration
+logging:
+  level:
+    root: INFO
+    com.example.book: DEBUG
+    io.github.resilience4j: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+---
+# ==========================================
+# Profile DEV - H2 Database (in-memory)
+# ==========================================
+spring:
+  config:
+    activate:
+      on-profile: dev
+
+  datasource:
+    url: jdbc:h2:mem:booksdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    username: sa
+    password: 
+    driver-class-name: org.h2.Driver
+  
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+      settings:
+        web-allow-others: true
+  
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+logging:
+  level:
+    root: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+
+---
+# ==========================================
+# Profile PROD - MySQL Database (Docker)
+# ==========================================
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://mysql:3306/books?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true}
+    username: ${SPRING_DATASOURCE_USERNAME:booksuser}
+    password: ${SPRING_DATASOURCE_PASSWORD:bookspass}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  
+  jpa:
+    database-platform: org.hibernate.dialect.MySQLDialect
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+
+logging:
+  level:
+    root: INFO
+    com.example.book: INFO
+    io.github.resilience4j: INFO

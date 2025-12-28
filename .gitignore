@@ -1,0 +1,36 @@
+# Maven
+target/
+*.jar
+*.war
+*.ear
+
+# IDE
+.idea/
+*.iml
+.vscode/
+*.code-workspace
+
+# Logs
+*.log
+logs/
+
+# System
+.DS_Store
+Thumbs.db
+
+# Docker
+mysql-data/
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+*~
+
+# Compiled files
+*.class
+
+# Package files
+*.zip
+*.tar.gz
+*.rar
